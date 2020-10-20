@@ -1,0 +1,73 @@
+#!/usr/bin/python3
+
+# Python program to read 
+# json file 
+  
+import json 
+import mysql.connector
+from mysql.connector import Error
+import os
+
+os.system('wget https://api.nordvpn.com/server') 
+os.system('cat before server after >servers.json')
+
+# Opening JSON file 
+ff = open('servers.json',)
+  
+# returns JSON object as  
+# a dictionary 
+data = json.load(ff) 
+  
+connection = mysql.connector.connect(host='localhost',database='worldcities',user='root',password='')
+
+# Iterating through the json 
+# list 
+sv=0
+nsv=0
+arglist = [('test', '0.0.0.0', 'us', 'chicago', 'IL', 0.01, 0.01)]
+nodetotal=0
+for i in data['nodes']: 
+  isstandard=0
+  mynodename = i['name']
+  mydomain = i['domain']
+  categories = i['categories']
+  for cat in i['categories']:
+    myname = cat['name']
+    if "Standard VPN" in myname:
+      isstandard=1
+  myflag = i['flag']
+  mycountry = i['country']
+  myip = i['ip_address']
+  mylat = i['location']['lat']
+  smylat = str(mylat)
+  mylng = i['location']['long']
+  smylng = str(mylng)
+  isudp = i['features']['openvpn_udp']
+#  print("ISUDP: " + str(isudp) + " ISSTANDARD: " + str(isstandard) + " myflag: " + myflag)
+  if (isstandard >0 and isudp==True and myflag=="US"):
+    nodetotal+=1
+    print("Node: ", mynodename, " - IP: ", myip)
+    print("  " + smylat + ", " + smylng)
+    sql_select_query = 'select country,acity,region,lat,lng,sqrt(pow(69.1*(lat-' + str(mylat) + '),2)+pow(69.1*(lng-' + str(mylng) + ')*cos(lat/57.3),2)) as distance from worldcities having distance<5 order by distance limit 1'
+    cursor = connection.cursor()
+    cursor.execute(sql_select_query)
+    records = cursor.fetchall()
+    for row in records:
+      mycity=row[1]
+      myregion=row[2]
+    print("  " + mycity + ", " + myregion + "," + mycountry + "(" + myflag + ")")
+    myindex=mynodename.find('#') + 1
+    myend=myindex+4
+    nodenum=mynodename[myindex:myend]
+    #print("  myindex: " + str(myindex) + " nodenum: " + nodenum)
+    #print("  NODE#: " + nodenum)
+    cleancity=mycity.replace(' ','_')
+    myfilename=("newovpn/" + myflag + "-" + myregion + "-" + cleancity + "-" + str(nodenum) + "-udp.ovpn")
+    print("  " + myfilename)
+    os.system('cp newovpn/template ' + myfilename)
+    os.system("sed -i 's/ipaddress/'" + myip + "/g " + myfilename)
+    
+    print("  Total Nodes: " + str(nodetotal))
+cursor.close()
+connection.close()
+ff.close() 

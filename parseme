@@ -1,0 +1,63 @@
+#!/usr/bin/python3
+
+# Python program to read 
+# json file 
+  
+import json 
+import mysql.connector
+from mysql.connector import Error
+
+# Opening JSON file 
+ff = open('servers.json',)
+  
+# returns JSON object as  
+# a dictionary 
+data = json.load(ff) 
+  
+connection = mysql.connector.connect(host='localhost',database='worldcities',user='root',password='')
+
+# Iterating through the json 
+# list 
+arglist = [('test', '0.0.0.0', 'us', 'chicago', 'IL', 0.01, 0.01)]
+for i in data['nodes']: 
+    mynodename = i['domain']
+    myflag = i['flag']
+    mycountry = i['country']
+    myip = i['ip_address']
+    mylat = i['location']['lat']
+    smylat = str(mylat)
+    mylng = i['location']['long']
+    smylng = str(mylng)
+    print("Node: ", mynodename, " - IP: ", myip)
+    print("  " + smylat + ", " + smylng)
+
+    sql_select_query = 'select country,acity,region,lat,lng,sqrt(pow(69.1*(lat-' + str(mylat) + '),2)+pow(69.1*(lng-' + str(mylng) + ')*cos(lat/57.3),2)) as distance from worldcities having distance<5 order by distance limit 1'
+#    print("QUERY", sql_select_query)
+    cursor = connection.cursor()
+    cursor.execute(sql_select_query)
+    records = cursor.fetchall()
+    for row in records:
+        mycity=row[1]
+        myregion=row[2]
+    print("  " + mycity + ", " + myregion + "," + mycountry + "(" + myflag + ")")
+    print
+    myass = "insert into nodes (nodename,nodeip,country,city,region,lat,lng) values (%s,%s,%s,%s,%s,%s,%s)"
+    print("Query: ", myass)
+#    assargs = (mynodename, myip, mycountry, mycity, myregion, mylat, mylng)
+    icursor = connection.cursor()
+    arglist.append((mynodename,myip,mycountry,mycity,myregion,mylat,mylng))
+    print("Args: ", mynodename, myip, mycountry, mycity, myregion, mylat, mylng)
+   #arglist)
+icursor.executemany(myass, arglist);
+print("Query:", icursor.statement)
+print("Rowcount:", icursor.rowcount)
+    
+connection.commit()
+icursor.close()
+cursor.close()
+connection.close()
+#except Error as e:
+#    print("Error reading data from MySQL table", e)
+        
+# Closing file 
+#ff.close() 
